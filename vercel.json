@@ -1,16 +1,5 @@
 {
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "build": {
-    "env": {
-      "GRAPHVIZ_PATH": "/usr/local/bin/dot"
-    },
-    "commands": [
-      "apt-get update && apt-get install -y graphviz"
-    ]
-  }
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index" }
+  ]
 }
