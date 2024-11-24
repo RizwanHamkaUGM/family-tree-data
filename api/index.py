@@ -14,8 +14,7 @@ cred_dict = json.loads(firebase_credentials)
 
 cred = credentials.Certificate(cred_dict)
 initialize_app(cred, {"databaseURL": "https://silsilah-keluarga-10d90-default-rtdb.firebaseio.com/"})
-
-STATIC_FOLDER = "/tmp"
+STATIC_FOLDER = "static"
 os.makedirs(STATIC_FOLDER, exist_ok=True)  
 
 def load_data():
@@ -80,7 +79,7 @@ def generate_family_tree(family):
         if "parent2_id" in member and member["parent2_id"]:
             graph.add_edge(pydot.Edge(str(member["parent2_id"]), str(member["id"])))
 
-    output_path = "/tmp/family_tree"
+    output_path = os.path.join(STATIC_FOLDER, "family_tree.png")
     graph.write_png(output_path)
 
     if not os.path.exists(output_path):
@@ -121,7 +120,7 @@ def describe_relationship(member_id):
     relationships = calculate_relationship(data, member_id)
     
     if not relationships:
-        return jsonify([]), 200
+        return jsonify([]), 200  # Jika tidak ada hubungan ditemukan, kembalikan array kosong
 
     response = [
         {
@@ -139,13 +138,9 @@ def describe_relationship(member_id):
 @app.route("/family/tree", methods=["GET"])
 def family_tree():
     """Mengembalikan file PNG silsilah keluarga."""
-    try:
-        data = load_data()["family"]
-        image_path = generate_family_tree(data)
-        return send_file(image_path, mimetype="image/png")
-    except Exception as e:
-        app.logger.error(f"Error generating family tree: {e}")
-        return jsonify({"error": "Failed to generate family tree"}), 500
+    data = load_data()["family"]
+    image_path = generate_family_tree(data)
+    return send_file(image_path, mimetype="image/png")
 
 @app.route("/family/<int:member_id>", methods=["PUT"])
 def update_family_member(member_id):
