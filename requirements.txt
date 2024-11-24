@@ -1,6 +1,5 @@
-Flask
-Flask-Cors
-firebase-admin
-pydot
-pyparsing
-graphviz
+Flask==2.0.1
+firebase-admin==5.0.0
+flask-cors==3.0.10
+graphviz==0.20.1
+python-dotenv==0.19.0
