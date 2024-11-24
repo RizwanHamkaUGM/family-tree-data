@@ -80,17 +80,14 @@ def generate_family_tree(family):
         if "parent2_id" in member and member["parent2_id"]:
             graph.edge(str(member["parent2_id"]), str(member["id"]))
 
-    # Membuat folder static jika belum ada
-    os.makedirs(STATIC_FOLDER, exist_ok=True)
-
-    # Gabungkan path untuk menyimpan file PNG
-    output_path = os.path.join(STATIC_FOLDER, "family_tree")
+    # Ganti path output dengan /tmp (Vercel writable directory)
+    output_path = "/tmp/family_tree"
     graph.render(output_path, format="png", cleanup=True)
 
     full_path = f"{output_path}.png"
     if not os.path.exists(full_path):
         raise FileNotFoundError(f"File not found: {full_path}")
-    
+
     return full_path
 
 @app.route("/family", methods=["GET"])
