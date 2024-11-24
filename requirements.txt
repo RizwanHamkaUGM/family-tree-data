@@ -1,5 +1,5 @@
 Flask
+Flask-Cors
 firebase-admin
-flask-cors
-graphviz
-gunicorn
+pydot
+pyparsing
