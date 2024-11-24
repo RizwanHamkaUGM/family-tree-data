@@ -1,26 +1,22 @@
 from flask import Flask, request, jsonify, send_file
 from graphviz import Digraph
 import os
-import json
 from firebase_admin import credentials, initialize_app, db
 from flask_cors import CORS
+import json
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Mendapatkan kredensial Firebase dari environment variable
 firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
 
-# Mengkonversi kredensial JSON string menjadi dictionary
 cred_dict = json.loads(firebase_credentials)
 
-# Inisialisasi Firebase
 cred = credentials.Certificate(cred_dict)
 initialize_app(cred, {"databaseURL": "https://silsilah-keluarga-10d90-default-rtdb.firebaseio.com/"})
 
-# Menggunakan direktori /tmp/ untuk penyimpanan sementara di Vercel
 STATIC_FOLDER = "/tmp"
-os.makedirs(STATIC_FOLDER, exist_ok=True)
+os.makedirs(STATIC_FOLDER, exist_ok=True)  
 
 def load_data():
     """Memuat data keluarga dari Firebase."""
@@ -84,7 +80,10 @@ def generate_family_tree(family):
         if "parent2_id" in member and member["parent2_id"]:
             graph.edge(str(member["parent2_id"]), str(member["id"]))
 
-    # Menyimpan file di direktori sementara /tmp/
+    # Membuat folder static jika belum ada
+    os.makedirs(STATIC_FOLDER, exist_ok=True)
+
+    # Gabungkan path untuk menyimpan file PNG
     output_path = os.path.join(STATIC_FOLDER, "family_tree")
     graph.render(output_path, format="png", cleanup=True)
 
