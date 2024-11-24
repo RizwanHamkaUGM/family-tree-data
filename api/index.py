@@ -80,7 +80,7 @@ def generate_family_tree(family):
         if "parent2_id" in member and member["parent2_id"]:
             graph.edge(str(member["parent2_id"]), str(member["id"]))
 
-    # Ganti path output dengan /tmp (Vercel writable directory)
+    # Simpan file di direktori yang dapat diakses, misalnya /tmp
     output_path = "/tmp/family_tree"
     graph.render(output_path, format="png", cleanup=True)
 
@@ -141,9 +141,13 @@ def describe_relationship(member_id):
 @app.route("/family/tree", methods=["GET"])
 def family_tree():
     """Mengembalikan file PNG silsilah keluarga."""
-    data = load_data()["family"]
-    image_path = generate_family_tree(data)
-    return send_file(image_path, mimetype="image/png")
+    try:
+        data = load_data()["family"]
+        image_path = generate_family_tree(data)
+        return send_file(image_path, mimetype="image/png")
+    except Exception as e:
+        app.logger.error(f"Error generating family tree: {e}")
+        return jsonify({"error": "Failed to generate family tree"}), 500
 
 @app.route("/family/<int:member_id>", methods=["PUT"])
 def update_family_member(member_id):
