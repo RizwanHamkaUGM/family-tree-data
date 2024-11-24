@@ -4,18 +4,19 @@ import os
 from firebase_admin import credentials, initialize_app, db
 from flask_cors import CORS
 import json
-from base64 import b64encode
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
+
 cred_dict = json.loads(firebase_credentials)
+
 cred = credentials.Certificate(cred_dict)
 initialize_app(cred, {"databaseURL": "https://silsilah-keluarga-10d90-default-rtdb.firebaseio.com/"})
 
 STATIC_FOLDER = "/tmp"
-os.makedirs(STATIC_FOLDER, exist_ok=True)
+os.makedirs(STATIC_FOLDER, exist_ok=True)  
 
 def load_data():
     """Memuat data keluarga dari Firebase."""
@@ -28,10 +29,41 @@ def save_data(data):
     ref = db.reference("family")
     ref.set(data["family"])
 
-def generate_family_tree_base64(family):
-    """Menghasilkan silsilah keluarga dalam format base64 menggunakan Graphviz."""
-    graph = Digraph(format="png")
-    graph.attr(rankdir="TB")
+def calculate_relationship(family, member_id):
+    """Menghitung hubungan antara anggota keluarga."""
+    relationships = {}
+    id_to_member = {member["id"]: member for member in family}
+
+    for member in family:
+        if member["id"] == member_id:
+            continue
+
+        parent1_id = member.get("parent1_id")
+        parent2_id = member.get("parent2_id")
+        member_parents = (parent1_id, parent2_id)
+
+        # Hubungan logis
+        if member_id in member_parents:
+            relationships[member["id"]] = "Anak"
+        elif any(
+            id_to_member.get(parent_id, {}).get("parent1_id") == member_id
+            for parent_id in member_parents if parent_id
+        ):
+            relationships[member["id"]] = "Cucu"
+        elif member_id in (
+            id_to_member.get(parent1_id, {}).get("parent1_id"),
+            id_to_member.get(parent1_id, {}).get("parent2_id"),
+        ):
+            relationships[member["id"]] = "Keponakan"
+        elif parent1_id and id_to_member.get(parent1_id, {}).get("parent1_id") == id_to_member.get(member_id, {}).get("parent1_id"):
+            relationships[member["id"]] = "Saudara"
+
+    return relationships
+
+def generate_family_tree(family):
+    """Menghasilkan silsilah keluarga dalam format PNG menggunakan Graphviz."""
+    graph = Digraph(format="png")  # Tentukan path jika perlu
+    graph.attr(rankdir="TB")  # Top-to-Bottom layout
 
     # Tambahkan node untuk setiap anggota keluarga
     for member in family:
@@ -48,32 +80,21 @@ def generate_family_tree_base64(family):
         if "parent2_id" in member and member["parent2_id"]:
             graph.edge(str(member["parent2_id"]), str(member["id"]))
 
-    # Simpan file di direktori /tmp
+    # Simpan file di direktori yang dapat diakses, misalnya /tmp
     output_path = "/tmp/family_tree"
     graph.render(output_path, format="png", cleanup=True)
 
-    # Encode file menjadi Base64
-    with open(f"{output_path}.png", "rb") as f:
-        encoded_image = b64encode(f.read()).decode('utf-8')
+    full_path = f"{output_path}.png"
+    if not os.path.exists(full_path):
+        raise FileNotFoundError(f"File not found: {full_path}")
 
-    return encoded_image
+    return full_path
 
 @app.route("/family", methods=["GET"])
 def get_family():
     """Mengembalikan data keluarga."""
     data = load_data()
     return jsonify(data)
-
-@app.route("/family/tree", methods=["GET"])
-def family_tree():
-    """Mengembalikan gambar silsilah keluarga dalam format Base64."""
-    try:
-        data = load_data()["family"]
-        image_base64 = generate_family_tree_base64(data)
-        return jsonify({"image": image_base64})
-    except Exception as e:
-        app.logger.error(f"Error generating family tree: {e}")
-        return jsonify({"error": "Failed to generate family tree"}), 500
 
 @app.route("/family", methods=["POST"])
 def add_family_member():
@@ -94,6 +115,73 @@ def add_family_member():
     data["family"].append(new_member)
     save_data(data)
     return jsonify({"message": "Member added successfully"}), 201
+
+@app.route("/family/relationship/<int:member_id>", methods=["GET"])
+def describe_relationship(member_id):
+    """Menghitung dan mengembalikan hubungan keluarga untuk anggota tertentu."""
+    data = load_data()["family"]
+    relationships = calculate_relationship(data, member_id)
+    
+    if not relationships:
+        return jsonify([]), 200
+
+    response = [
+        {
+            "id": related_id,
+            "name": next(
+                (member["name"] for member in data if member["id"] == related_id),
+                "Unknown"
+            ),
+            "relationship": relationship,
+        }
+        for related_id, relationship in relationships.items()
+    ]
+    return jsonify(response)
+
+@app.route("/family/tree", methods=["GET"])
+def family_tree():
+    """Mengembalikan file PNG silsilah keluarga."""
+    try:
+        data = load_data()["family"]
+        image_path = generate_family_tree(data)
+        return send_file(image_path, mimetype="image/png")
+    except Exception as e:
+        app.logger.error(f"Error generating family tree: {e}")
+        return jsonify({"error": "Failed to generate family tree"}), 500
+
+@app.route("/family/<int:member_id>", methods=["PUT"])
+def update_family_member(member_id):
+    """Memperbarui data anggota keluarga berdasarkan ID."""
+    data = load_data()
+    updated_data = request.json
+
+    for member in data["family"]:
+        if member["id"] == member_id:
+            member["name"] = updated_data.get("name", member["name"])
+            member["anggota"] = updated_data.get("anggota", member["anggota"])
+            member["parent1_id"] = updated_data.get("parent1_id", member["parent1_id"])
+            member["parent2_id"] = updated_data.get("parent2_id", member["parent2_id"])
+            save_data(data)
+            return jsonify({"message": "Member updated successfully"}), 200
+
+    return jsonify({"error": "Member not found"}), 404
+
+@app.route("/family/<int:member_id>", methods=["DELETE"])
+def delete_family_member(member_id):
+    """Menghapus anggota keluarga berdasarkan ID."""
+    data = load_data()
+    updated_family = [member for member in data["family"] if member["id"] != member_id]
+
+    if len(updated_family) == len(data["family"]):
+        return jsonify({"error": "Member not found"}), 404
+
+    save_data({"family": updated_family})
+    return jsonify({"message": "Member deleted successfully"}), 200
+
+@app.route("/family", methods=["OPTIONS"])
+@app.route("/family/<int:member_id>", methods=["OPTIONS"])
+def handle_options():
+    return "", 200  
 
 if __name__ == "__main__":
     app.run(debug=True)
