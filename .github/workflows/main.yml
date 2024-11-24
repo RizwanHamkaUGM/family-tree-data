@@ -23,15 +23,12 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y graphviz
         pip install -r requirements.txt
-
-    - name: Install Vercel CLI
-      run: |
-        curl -sL https://github.com/vercel/vercel/releases/download/39.1.1/vercel-linux.tar.gz | tar -xz
-        sudo mv vercel /usr/local/bin
+        npm install -g vercel
 
     - name: Deploy to Vercel
       env:
         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       run: |
         vercel --token $VERCEL_TOKEN --prod --yes
