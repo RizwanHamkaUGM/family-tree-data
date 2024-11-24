@@ -5,6 +5,7 @@ from firebase_admin import credentials, initialize_app, db
 from flask_cors import CORS
 import tempfile
 from datetime import datetime
+import json
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
