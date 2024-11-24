@@ -1,18 +1,23 @@
 from flask import Flask, request, jsonify, send_file
-import pydot
+from graphviz import Digraph
 import os
 from firebase_admin import credentials, initialize_app, db
 from flask_cors import CORS
-import json
+import tempfile
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+# Gunakan temporary directory untuk file static
+STATIC_FOLDER = tempfile.gettempdir()
 
 firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
 cred_dict = json.loads(firebase_credentials)
 
 cred = credentials.Certificate(cred_dict)
 initialize_app(cred, {"databaseURL": "https://silsilah-keluarga-10d90-default-rtdb.firebaseio.com/"})
+
 
 def load_data():
     """Memuat data keluarga dari Firebase."""
@@ -57,31 +62,48 @@ def calculate_relationship(family, member_id):
     return relationships
 
 def generate_family_tree(family):
-    """Menghasilkan silsilah keluarga dalam format PNG menggunakan pydot."""
-    graph = pydot.Dot(graph_type="digraph", rankdir="TB")
+    """Menghasilkan silsilah keluarga dalam format PNG menggunakan Graphviz dengan temporary directory."""
+    # Buat temporary directory
+    temp_dir = tempfile.mkdtemp()
+    
+    # Buat instance Digraph dengan directory temporary
+    graph = Digraph(format="png")
+    graph.attr(rankdir="TB")
 
     # Tambahkan node untuk setiap anggota keluarga
     for member in family:
-        node = pydot.Node(
+        graph.node(
             str(member["id"]),
             label=f'{member["name"]}\n({member.get("anggota", "")})',
             shape="box",
         )
-        graph.add_node(node)
 
     # Tambahkan edge untuk hubungan orang tua-anak
     for member in family:
         if "parent1_id" in member and member["parent1_id"]:
-            graph.add_edge(pydot.Edge(str(member["parent1_id"]), str(member["id"])))
+            graph.edge(str(member["parent1_id"]), str(member["id"]))
         if "parent2_id" in member and member["parent2_id"]:
-            graph.add_edge(pydot.Edge(str(member["parent2_id"]), str(member["id"])))
+            graph.edge(str(member["parent2_id"]), str(member["id"]))
 
-    output_path = os.path.join("/tmp", "family_tree.png")
-    graph.write_png(output_path)  # Generate PNG di /tmp
-    if not os.path.exists(output_path):
-        raise FileNotFoundError(f"File not found: {output_path}")
+    # Buat nama file unik dengan timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = os.path.join(temp_dir, f"family_tree_{timestamp}")
     
-    return output_path
+    try:
+        # Render graph ke file temporary
+        graph.render(output_path, format="png", cleanup=True)
+        
+        # Path lengkap ke file PNG yang dihasilkan
+        full_path = f"{output_path}.png"
+        
+        if not os.path.exists(full_path):
+            raise FileNotFoundError(f"File not found: {full_path}")
+        
+        return full_path
+        
+    except Exception as e:
+        print(f"Error generating family tree: {str(e)}")
+        raise
 
 @app.route("/family", methods=["GET"])
 def get_family():
@@ -133,10 +155,30 @@ def describe_relationship(member_id):
 
 @app.route("/family/tree", methods=["GET"])
 def family_tree():
-    """Mengembalikan file PNG silsilah keluarga."""
-    data = load_data()["family"]
-    image_path = generate_family_tree(data)
-    return send_file(image_path, mimetype="image/png")
+    """Endpoint untuk menghasilkan dan mengirim file PNG silsilah keluarga."""
+    try:
+        data = load_data()["family"]
+        image_path = generate_family_tree(data)
+        
+        # Kirim file dan set callback untuk menghapus file setelah terkirim
+        return send_file(
+            image_path,
+            mimetype="image/png",
+            as_attachment=True,
+            download_name="family_tree.png"
+        )
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
+    finally:
+        # Cleanup: hapus file temporary jika masih ada
+        try:
+            if 'image_path' in locals() and os.path.exists(image_path):
+                os.remove(image_path)
+                os.rmdir(os.path.dirname(image_path))
+        except Exception as e:
+            print(f"Error during cleanup: {str(e)}")
 
 @app.route("/family/<int:member_id>", methods=["PUT"])
 def update_family_member(member_id):
