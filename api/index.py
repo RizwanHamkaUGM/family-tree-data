@@ -62,7 +62,7 @@ def calculate_relationship(family, member_id):
 
 def generate_family_tree(family):
     """Menghasilkan silsilah keluarga dalam format PNG menggunakan Graphviz."""
-    graph = Digraph(format="png", engine="/usr/local/bin/dot")
+    graph = Digraph(format="png", engine="/usr/local/bin/dot")  # Tentukan path jika perlu
     graph.attr(rankdir="TB")  # Top-to-Bottom layout
 
     # Tambahkan node untuk setiap anggota keluarga
