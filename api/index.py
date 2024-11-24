@@ -15,7 +15,7 @@ cred_dict = json.loads(firebase_credentials)
 cred = credentials.Certificate(cred_dict)
 initialize_app(cred, {"databaseURL": "https://silsilah-keluarga-10d90-default-rtdb.firebaseio.com/"})
 
-STATIC_FOLDER = "static"
+STATIC_FOLDER = os.path.join("static")
 os.makedirs(STATIC_FOLDER, exist_ok=True)  
 
 def load_data():
@@ -80,6 +80,10 @@ def generate_family_tree(family):
         if "parent2_id" in member and member["parent2_id"]:
             graph.edge(str(member["parent2_id"]), str(member["id"]))
 
+    # Membuat folder static jika belum ada
+    os.makedirs(STATIC_FOLDER, exist_ok=True)
+
+    # Gabungkan path untuk menyimpan file PNG
     output_path = os.path.join(STATIC_FOLDER, "family_tree")
     graph.render(output_path, format="png", cleanup=True)
 
