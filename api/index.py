@@ -9,13 +9,10 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
-
 cred_dict = json.loads(firebase_credentials)
 
 cred = credentials.Certificate(cred_dict)
 initialize_app(cred, {"databaseURL": "https://silsilah-keluarga-10d90-default-rtdb.firebaseio.com/"})
-STATIC_FOLDER = "static"
-os.makedirs(STATIC_FOLDER, exist_ok=True)  
 
 def load_data():
     """Memuat data keluarga dari Firebase."""
@@ -79,9 +76,8 @@ def generate_family_tree(family):
         if "parent2_id" in member and member["parent2_id"]:
             graph.add_edge(pydot.Edge(str(member["parent2_id"]), str(member["id"])))
 
-    output_path = os.path.join(STATIC_FOLDER, "family_tree.png")
-    graph.write_png(output_path)
-
+    output_path = os.path.join("/tmp", "family_tree.png")
+    graph.write_png(output_path)  # Generate PNG di /tmp
     if not os.path.exists(output_path):
         raise FileNotFoundError(f"File not found: {output_path}")
     
