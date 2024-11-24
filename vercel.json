@@ -2,4 +2,24 @@
   "rewrites": [
     { "source": "/(.*)", "destination": "/api/index" }
   ]
+    "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    }
+  ],
+  "env": {
+    "GRAPHVIZ_PATH": "/usr/local/bin/dot"
+  },
+  "build": {
+    "env": {
+      "GRAPHVIZ_PATH": "/usr/local/bin/dot"
+    },
+    "commands": [
+      "apt-get update",
+      "apt-get install -y graphviz"
+    ]
 }
